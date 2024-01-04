@@ -1,0 +1,37 @@
+trigger:
+- main
+
+resources:
+- repo: self
+
+stages:
+- stage: PullAndPushImage
+  jobs:
+  - job: PullFromECRPushToROSA
+    displayName: 'Pull image from AWS ECR and Push to ROSA'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - task: AmazonWebServices.aws-vsts-tools.ECRPushImage.AWSECRPushImage@1
+      displayName: 'Login to AWS ECR'
+      inputs:
+        awsCredentials: 'your-aws-service-connection' # Specify your AWS service connection
+        regionName: 'your-region' # Specify your AWS region
+
+    - script: |
+        docker pull your-aws-ecr-repository-url/your-image:your-tag
+      displayName: 'Pull Image from ECR'
+
+    - task: CmdLine@2
+      displayName: 'Login to OpenShift'
+      inputs:
+        script: |
+          echo $(oc-login-command) | bash
+      env:
+        oc-login-command: $(oc-login-command) # Specify your OpenShift login command here
+
+    - script: |
+        docker tag your-aws-ecr-repository-url/your-image:your-tag your-rosa-registry-url/your-image:your-tag
+        docker push your-rosa-registry-url/your-image:your-tag
+      displayName: 'Push Image to ROSA'
