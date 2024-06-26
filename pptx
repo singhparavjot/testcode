@@ -1,0 +1,174 @@
+# Adjusting the table dimensions to avoid the IndexError
+# Create a PowerPoint presentation
+presentation = Presentation()
+
+# Add slides and content as per the outlined structure
+# Slide 1: Title Slide
+slide_layout = presentation.slide_layouts[0]  # Title slide layout
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+subtitle = slide.placeholders[1]
+title.text = "Optimizing Azure Costs: AKS vs. VMs"
+subtitle.text = "Strategies to Reduce Infrastructure Costs\nPresenter's Name: Sugar\nDate: [Insert Date]"
+
+# Slide 2: Introduction
+slide_layout = presentation.slide_layouts[1]  # Title and content layout
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Introduction to Cost Optimization"
+content.text = "Overview of current infrastructure costs (3 lakhs)\nObjective: Reduce costs to 1.5 lakhs\nKey strategies: Reserved Instances, Azure Hybrid Benefit, containerization with AKS"
+
+# Slide 3: Current Infrastructure Overview
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Current Infrastructure"
+content.text = "Description of the current setup using multiple VMs and SQL Server instances\nHighlight the high compute, storage, and networking costs"
+
+# Slide 4: Cost Components of VMs
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Cost Components of VMs"
+content.text = "Compute: Charged based on VM size (vCPU, memory)\nStorage: Costs for OS and data disks\nNetworking: Data transfer costs\nManagement Overhead: Maintenance, patching, scaling"
+
+# Slide 5: Cost Components of SQL Server
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Cost Components of SQL Server"
+content.text = "Compute: vCore-based pricing\nStorage: Costs for data storage and backup\nLicensing: SQL Server licensing costs"
+
+# Slide 6: Introduction to Azure Kubernetes Service (AKS)
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Introduction to AKS"
+content.text = "Managed Kubernetes service\nAutomates deployment, scaling, and operations of containers"
+
+# Slide 7: Cost Components of AKS
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Cost Components of AKS"
+content.text = "Compute: Nodes are regular VMs, charged at standard rates\nControl Plane: Free\nStorage: Costs for persistent storage\nNetworking: Load balancers, ingress controllers\nAdditional Services: Azure Container Registry, monitoring"
+
+# Slide 8: Cost Comparison: VMs vs. AKS
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+title.text = "Cost Comparison: VMs vs. AKS"
+
+# Add the VM vs. AKS comparison table
+rows = 5
+cols = 7
+left = Inches(0.5)
+top = Inches(1.5)
+width = Inches(9)
+height = Inches(2.5)
+
+table = slide.shapes.add_table(rows, cols, left, top, width, height).table
+
+# Set column names
+table.cell(0, 0).text = 'Service'
+table.cell(0, 1).text = 'VM Type'
+table.cell(0, 2).text = 'vCPU'
+table.cell(0, 3).text = 'Memory (GB)'
+table.cell(0, 4).text = 'Hourly Cost ($)'
+table.cell(0, 5).text = 'Monthly Cost ($)'
+table.cell(0, 6).text = 'Annual Cost ($)'
+
+# Fill the table with the data
+data = [
+    ["VMs", "Standard D2s v3", "2", "8", "0.096", "69.12", "829.44"],
+    ["VMs", "Standard E4s v3", "4", "32", "0.504", "362.88", "4354.56"],
+    ["AKS", "4 x Standard D2s v3 Nodes", "2 (each)", "8 (each)", "0.096 (each)", "69.12 (each)", "829.44 (each)"],
+    ["Total for 4 nodes", "8", "32", "0.384", "276.48", "3317.76"]
+]
+
+for i, row_data in enumerate(data, start=1):
+    for j, cell_data in enumerate(row_data):
+        table.cell(i, j).text = cell_data
+
+# Slide 9: SQL Server Savings
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "SQL Server Savings"
+content.text = "Azure SQL Database Reserved vCore: Significant savings compared to pay-as-you-go\nAzure Hybrid Benefit: Use existing SQL Server licenses to save up to 80% when combined with reserved instances"
+
+# Slide 10: Cost-Saving Strategies
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Cost-Saving Strategies"
+content.text = "1. Reserved Instances: Up to 72% savings\n2. Azure Hybrid Benefit: Up to 80% savings when combined with reserved instances\n3. Azure Savings Plans: Flexible pricing for variable workloads\n4. Spot VMs: For non-critical, interruptible workloads\n5. Right-Sizing VMs: Regularly adjust VM sizes based on workload needs"
+
+# Slide 11: Containerization Benefits
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Benefits of Containerization"
+content.text = "Resource Efficiency: Containers share the same OS kernel\nScalability: Kubernetes automatically scales resources\nReduced Overheads: Fewer VMs needed, lower costs\nHigh Availability: Built-in features for failover and load balancing"
+
+# Slide 12: Implementation Plan
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Implementation Plan"
+content.text = "1. Assessment: Evaluate current usage and identify candidates for reserved instances and hybrid benefits\n2. Purchase and Configure: Reserved VM instances and SQL Server reserved capacity\n3. Containerization and AKS Setup: Move applications to Docker containers and deploy on AKS\n4. Continuous Monitoring: Use Azure Cost Management and Azure Advisor"
+
+# Slide 13: Conclusion
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Conclusion"
+content.text = "Combining reserved instances, Azure Hybrid Benefit, savings plans, and AKS\nSignificant cost reduction while maintaining performance and scalability\nAchieving the target cost reduction from 3 lakhs to 1.5 lakhs effectively"
+
+# Slide 14: Q&A
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+content = slide.placeholders[1]
+title.text = "Questions & Answers"
+content.text = "Open the floor for questions and provide detailed answers based on the presentation content."
+
+# Add the additional slide for VM Savings vs Reservation table
+slide = presentation.slides.add_slide(slide_layout)
+title = slide.shapes.title
+title.text = "VM Savings vs Reservation"
+
+# Add the VM Savings vs Reservation table
+rows = 6
+cols = 5
+left = Inches(0.5)
+top = Inches(1.5)
+width = Inches(9)
+height = Inches(2.5)
+
+table = slide.shapes.add_table(rows, cols, left, top, width, height).table
+
+# Set column names
+table.cell(0, 0).text = 'Plan'
+table.cell(0, 1).text = 'Hourly Cost ($)'
+table.cell(0, 2).text = 'Monthly Cost ($)'
+table.cell(0, 3).text = 'Annual Cost ($)'
+table.cell(0, 4).text = '3-Year Total Cost ($)'
+
+# Fill the table with the data
+data = [
+    ["Pay-As-You-Go", "0.188", "137.00", "1644.00", "4932.00"],
+    ["Reserved Instance (1 year)", "0.144", "104.70", "1256.40", "3769.20"],
+    ["Reserved Instance (3 years)", "0.126", "91.98", "1103.76", "3311.28"],
+    ["Savings Plan (1 year)", "0.151", "109.76", "1317.12", "3951.36"],
+    ["Savings Plan (3 years)", "0.131", "95.52", "1146.24", "3438.72"]
+]
+
+for i, row_data in enumerate(data, start=1):
+    for j, cell_data in enumerate(row_data):
+        table.cell(i, j).text = cell_data
+
+# Save the presentation
+pptx_file = "/mnt/data/Azure_Cost_Optimization_Presentation_Final.pptx"
+presentation.save(pptx_file)
+
+pptx_file
