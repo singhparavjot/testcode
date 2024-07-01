@@ -1,174 +1,310 @@
-# Adjusting the table dimensions to avoid the IndexError
-# Create a PowerPoint presentation
-presentation = Presentation()
+# Define base directory
+$baseDir = "C:\PARAV-AKS"
 
-# Add slides and content as per the outlined structure
-# Slide 1: Title Slide
-slide_layout = presentation.slide_layouts[0]  # Title slide layout
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-subtitle = slide.placeholders[1]
-title.text = "Optimizing Azure Costs: AKS vs. VMs"
-subtitle.text = "Strategies to Reduce Infrastructure Costs\nPresenter's Name: Sugar\nDate: [Insert Date]"
+# Ensure fresh start by removing any existing directory
+if (Test-Path $baseDir) {
+    Remove-Item -Recurse -Force $baseDir
+}
+New-Item -ItemType Directory -Path $baseDir
 
-# Slide 2: Introduction
-slide_layout = presentation.slide_layouts[1]  # Title and content layout
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Introduction to Cost Optimization"
-content.text = "Overview of current infrastructure costs (3 lakhs)\nObjective: Reduce costs to 1.5 lakhs\nKey strategies: Reserved Instances, Azure Hybrid Benefit, containerization with AKS"
+# Create folder structure
+$folders = @(
+    "infrastructure\base_deployment\tfvars",
+    "infrastructure\variables",
+    "infrastructure\k8s",
+    "infrastructure\modules\aks",
+    "infrastructure\modules\container_registry",
+    "infrastructure\modules\key_vault",
+    "infrastructure\modules\log_analytics"
+)
 
-# Slide 3: Current Infrastructure Overview
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Current Infrastructure"
-content.text = "Description of the current setup using multiple VMs and SQL Server instances\nHighlight the high compute, storage, and networking costs"
+foreach ($folder in $folders) {
+    New-Item -ItemType Directory -Path (Join-Path -Path $baseDir -ChildPath $folder)
+}
 
-# Slide 4: Cost Components of VMs
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Cost Components of VMs"
-content.text = "Compute: Charged based on VM size (vCPU, memory)\nStorage: Costs for OS and data disks\nNetworking: Data transfer costs\nManagement Overhead: Maintenance, patching, scaling"
+# Create files with content
+$files = @{
+    "infrastructure\base_deployment\tfvars\dev.tfvars" = "resource_group_name = 'devResourceGroup'
+location = 'eastus'
+aks_name = 'devAKSCluster'
+acr_name = 'devacrregistry'"
+    "infrastructure\base_deployment\tfvars\prod.tfvars" = "resource_group_name = 'prodResourceGroup'
+location = 'eastus'
+aks_name = 'prodAKSCluster'
+acr_name = 'prodacrregistry'"
+    "infrastructure\base_deployment\tfvars\sit.tfvars" = "resource_group_name = 'sitResourceGroup'
+location = 'eastus'
+aks_name = 'sitAKSCluster'
+acr_name = 'sitacrregistry'"
+    "infrastructure\base_deployment\tfvars\uat.tfvars" = "resource_group_name = 'uatResourceGroup'
+location = 'eastus'
+aks_name = 'uatAKSCluster'
+acr_name = 'uatacrregistry'"
+    "infrastructure\base_deployment\main.tf" = @"
+terraform {
+  backend "azurerm" {}
+}
 
-# Slide 5: Cost Components of SQL Server
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Cost Components of SQL Server"
-content.text = "Compute: vCore-based pricing\nStorage: Costs for data storage and backup\nLicensing: SQL Server licensing costs"
+module "log_analytics" {
+  source              = "../modules/log_analytics"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  prefix              = var.prefix
+  tags                = var.tags
+}
 
-# Slide 6: Introduction to Azure Kubernetes Service (AKS)
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Introduction to AKS"
-content.text = "Managed Kubernetes service\nAutomates deployment, scaling, and operations of containers"
+module "key_vault" {
+  source              = "../modules/key_vault"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tenant_id           = var.tenant_id
+  prefix              = var.prefix
+  tags                = var.tags
+}
 
-# Slide 7: Cost Components of AKS
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Cost Components of AKS"
-content.text = "Compute: Nodes are regular VMs, charged at standard rates\nControl Plane: Free\nStorage: Costs for persistent storage\nNetworking: Load balancers, ingress controllers\nAdditional Services: Azure Container Registry, monitoring"
+module "aks" {
+  source              = "../modules/aks"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  aks_name            = var.aks_name
+  log_analytics_workspace_id = module.log_analytics.log_analytics_workspace_id
+  tags                = var.tags
+}
 
-# Slide 8: Cost Comparison: VMs vs. AKS
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-title.text = "Cost Comparison: VMs vs. AKS"
+module "container_registry" {
+  source              = "../modules/container_registry"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  acr_name            = var.acr_name
+  tags                = var.tags
+}
+"@
+    "infrastructure\base_deployment\provider.tf" = @"
+provider "azurerm" {
+  features {}
+}
 
-# Add the VM vs. AKS comparison table
-rows = 5
-cols = 7
-left = Inches(0.5)
-top = Inches(1.5)
-width = Inches(9)
-height = Inches(2.5)
+provider "helm" {
+  kubernetes {
+    host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
+    client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
+    client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
+    cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
+  }
+}
 
-table = slide.shapes.add_table(rows, cols, left, top, width, height).table
+provider "kubernetes" {
+  host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
+  client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
+  client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
+  cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
+}
+"@
+    "infrastructure\base_deployment\variables.tf" = @"
+variable "resource_group_name" {}
+variable "location" {}
+variable "prefix" {}
+variable "tenant_id" {}
+variable "aks_name" {}
+variable "acr_name" {}
+variable "tags" {
+  type    = map(string)
+  default = {}
+}
+"@
+    "infrastructure\variables\vars-dev.yml" = @"
+variables:
+  resourceGroup: 'devResourceGroup'
+  location: 'eastus'
+  aksCluster: 'devAKSCluster'
+  acrName: 'devacrregistry'
+  imageName: 'training-environment'
+  imageTag: 'latest'
+"@
+    "infrastructure\variables\vars-prod.yml" = @"
+variables:
+  resourceGroup: 'prodResourceGroup'
+  location: 'eastus'
+  aksCluster: 'prodAKSCluster'
+  acrName: 'prodacrregistry'
+  imageName: 'training-environment'
+  imageTag: 'latest'
+"@
+    "infrastructure\variables\vars-sit.yml" = @"
+variables:
+  resourceGroup: 'sitResourceGroup'
+  location: 'eastus'
+  aksCluster: 'sitAKSCluster'
+  acrName: 'sitacrregistry'
+  imageName: 'training-environment'
+  imageTag: 'latest'
+"@
+    "infrastructure\variables\vars-uat.yml" = @"
+variables:
+  resourceGroup: 'uatResourceGroup'
+  location: 'eastus'
+  aksCluster: 'uatAKSCluster'
+  acrName: 'uatacrregistry'
+  imageName: 'training-environment'
+  imageTag: 'latest'
+"@
+    "infrastructure\k8s\windows-vm-deployment.yaml" = @"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: windows-vm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: windows-vm
+  template:
+    metadata:
+      labels:
+        app: windows-vm
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": windows
+      containers:
+      - name: windows-vm
+        image: <your-windows-container-image>
+        ports:
+        - containerPort: 3389
+"@
+    "infrastructure\k8s\windows-vm-service.yaml" = @"
+apiVersion: v1
+kind: Service
+metadata:
+  name: windows-vm-service
+spec:
+  selector:
+    app: windows-vm
+  ports:
+    - protocol: TCP
+      port: 3389
+      targetPort: 3389
+  type: LoadBalancer
+"@
+    "azure-pipelines.yml" = @"
+trigger:
+- main
 
-# Set column names
-table.cell(0, 0).text = 'Service'
-table.cell(0, 1).text = 'VM Type'
-table.cell(0, 2).text = 'vCPU'
-table.cell(0, 3).text = 'Memory (GB)'
-table.cell(0, 4).text = 'Hourly Cost ($)'
-table.cell(0, 5).text = 'Monthly Cost ($)'
-table.cell(0, 6).text = 'Annual Cost ($)'
+parameters:
+- name: environments
+  type: object
+  default:
+    - name: dev
+      subscriptionConnection: 'dev-service-connection'
+    - name: sit
+      subscriptionConnection: 'sit-service-connection'
+    - name: uat
+      subscriptionConnection: 'uat-service-connection'
+    - name: prod
+      subscriptionConnection: 'prod-service-connection'
 
-# Fill the table with the data
-data = [
-    ["VMs", "Standard D2s v3", "2", "8", "0.096", "69.12", "829.44"],
-    ["VMs", "Standard E4s v3", "4", "32", "0.504", "362.88", "4354.56"],
-    ["AKS", "4 x Standard D2s v3 Nodes", "2 (each)", "8 (each)", "0.096 (each)", "69.12 (each)", "829.44 (each)"],
-    ["Total for 4 nodes", "8", "32", "0.384", "276.48", "3317.76"]
-]
+pool:
+  vmImage: 'ubuntu-latest'
 
-for i, row_data in enumerate(data, start=1):
-    for j, cell_data in enumerate(row_data):
-        table.cell(i, j).text = cell_data
+variables:
+  terraformVersion: '1.0.0'
 
-# Slide 9: SQL Server Savings
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "SQL Server Savings"
-content.text = "Azure SQL Database Reserved vCore: Significant savings compared to pay-as-you-go\nAzure Hybrid Benefit: Use existing SQL Server licenses to save up to 80% when combined with reserved instances"
+stages:
+- ${{ each env in parameters.environments }}:
+  - stage: DeployInfrastructureTo${{ env.name }}
+    displayName: Deploy Infrastructure to ${{ env.name }} Environment
+    variables:
+      - template: infrastructure/variables/vars-${{ env.name }}.yml
+    jobs:
+    - job: DeploymentPrerequisites
+      steps:
+      - task: AzureCLI@2
+        inputs:
+          azureSubscription: ${{ env.subscriptionConnection }}
+          scriptType: 'bash'
+          scriptLocation: 'inlineScript'
+          inlineScript: |
+            az group create --name $(resourceGroup) --location $(location)
+            az storage account create --name terraformbackend --resource-group $(resourceGroup) --location $(location) --sku Standard_LRS
+            az storage container create --name tfstate --account-name terraformbackend
 
-# Slide 10: Cost-Saving Strategies
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Cost-Saving Strategies"
-content.text = "1. Reserved Instances: Up to 72% savings\n2. Azure Hybrid Benefit: Up to 80% savings when combined with reserved instances\n3. Azure Savings Plans: Flexible pricing for variable workloads\n4. Spot VMs: For non-critical, interruptible workloads\n5. Right-Sizing VMs: Regularly adjust VM sizes based on workload needs"
+    - job: InfrastructureDeployment
+      dependsOn: DeploymentPrerequisites
+      steps:
+      - task: InstallTerraformInstaller@0
+        inputs:
+          terraformVersion: $(terraformVersion)
 
-# Slide 11: Containerization Benefits
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Benefits of Containerization"
-content.text = "Resource Efficiency: Containers share the same OS kernel\nScalability: Kubernetes automatically scales resources\nReduced Overheads: Fewer VMs needed, lower costs\nHigh Availability: Built-in features for failover and load balancing"
+      - script: terraform init -backend-config="resource_group_name=$(resourceGroup)" -backend-config="storage_account_name=terraformbackend" -backend-config="container_name=tfstate" -backend-config="key=terraform.tfstate"
+        displayName: 'Terraform Init'
 
-# Slide 12: Implementation Plan
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Implementation Plan"
-content.text = "1. Assessment: Evaluate current usage and identify candidates for reserved instances and hybrid benefits\n2. Purchase and Configure: Reserved VM instances and SQL Server reserved capacity\n3. Containerization and AKS Setup: Move applications to Docker containers and deploy on AKS\n4. Continuous Monitoring: Use Azure Cost Management and Azure Advisor"
+      - script: terraform plan -out=plan.tfplan -var-file=infrastructure/base_deployment/tfvars/${{ env.name }}.tfvars
+        displayName: 'Terraform Plan'
 
-# Slide 13: Conclusion
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Conclusion"
-content.text = "Combining reserved instances, Azure Hybrid Benefit, savings plans, and AKS\nSignificant cost reduction while maintaining performance and scalability\nAchieving the target cost reduction from 3 lakhs to 1.5 lakhs effectively"
+      - script: terraform apply -input=false plan.tfplan
+        displayName: 'Terraform Apply'
 
-# Slide 14: Q&A
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-content = slide.placeholders[1]
-title.text = "Questions & Answers"
-content.text = "Open the floor for questions and provide detailed answers based on the presentation content."
+- stage: BuildAndPushDockerImage
+  dependsOn: [${{ parameters.environments.name }}]
+  jobs:
+  - job: BuildAndPushDockerImage
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: ${{ env.subscriptionConnection }}
+        repository: '$(acrName)/$(imageName)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(imageTag)
 
-# Add the additional slide for VM Savings vs Reservation table
-slide = presentation.slides.add_slide(slide_layout)
-title = slide.shapes.title
-title.text = "VM Savings vs Reservation"
+- stage: Deploy
+  dependsOn: BuildAndPushDockerImage
+  jobs:
+  - job: Deploy
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: ${{ env.subscriptionConnection }}
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
+          helm repo add beryju https://charts.beryju.org
+          helm repo update
+          helm install guacamole beryju/guacamole --set guacamole.server.image.tag=1.2.0
+          kubectl apply -f k8s/windows-vm-deployment.yaml
+          kubectl apply -f k8s/windows-vm-service.yaml
+"@
+    "Dockerfile" = @"
+FROM mcr.microsoft.com/windows/servercore:ltsc2019
 
-# Add the VM Savings vs Reservation table
-rows = 6
-cols = 5
-left = Inches(0.5)
-top = Inches(1.5)
-width = Inches(9)
-height = Inches(2.5)
+# Install necessary packages
+RUN powershell -Command \\
+    Add-WindowsFeature RDS-RD-Server
 
-table = slide.shapes.add_table(rows, cols, left, top, width, height).table
+# Enable RDP
+RUN powershell -Command \\
+    Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name "fDenyTSConnections" -Value 0
 
-# Set column names
-table.cell(0, 0).text = 'Plan'
-table.cell(0, 1).text = 'Hourly Cost ($)'
-table.cell(0, 2).text = 'Monthly Cost ($)'
-table.cell(0, 3).text = 'Annual Cost ($)'
-table.cell(0, 4).text = '3-Year Total Cost ($)'
+# Open the RDP port
+EXPOSE 3389
 
-# Fill the table with the data
-data = [
-    ["Pay-As-You-Go", "0.188", "137.00", "1644.00", "4932.00"],
-    ["Reserved Instance (1 year)", "0.144", "104.70", "1256.40", "3769.20"],
-    ["Reserved Instance (3 years)", "0.126", "91.98", "1103.76", "3311.28"],
-    ["Savings Plan (1 year)", "0.151", "109.76", "1317.12", "3951.36"],
-    ["Savings Plan (3 years)", "0.131", "95.52", "1146.24", "3438.72"]
-]
+# Start RDP
+CMD ["powershell", "Start-Service -Name TermService; while ($true) { Start-Sleep -Seconds 3600 }"]
+"@
+}
 
-for i, row_data in enumerate(data, start=1):
-    for j, cell_data in enumerate(row_data):
-        table.cell(i, j).text = cell_data
+foreach ($path in $files.Keys) {
+    New-Item -ItemType File -Path (Join-Path -Path $baseDir -ChildPath $path) -Force | Out-Null
+    Set-Content -Path (Join-Path -Path $baseDir -ChildPath $path) -Value $files[$path]
+}
 
-# Save the presentation
-pptx_file = "/mnt/data/Azure_Cost_Optimization_Presentation_Final.pptx"
-presentation.save(pptx_file)
+# Create a zip file
+$zipPath = "C:\PARAV-AKS.zip"
+if (Test-Path $zipPath) {
+    Remove-Item -Force $zipPath
+}
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+[System.IO.Compression.ZipFile]::CreateFromDirectory($baseDir, $zipPath)
 
-pptx_file
+Write-Output "Zip file created at: $zipPath"
