@@ -5,7 +5,7 @@ $baseDir = "C:\PARAV-AKS"
 if (Test-Path $baseDir) {
     Remove-Item -Recurse -Force $baseDir
 }
-New-Item -ItemType Directory -Path $baseDir
+New-Item -ItemType Directory -Path $baseDir -Force | Out-Null
 
 # Create folder structure
 $folders = @(
@@ -19,50 +19,42 @@ $folders = @(
 )
 
 foreach ($folder in $folders) {
-    New-Item -ItemType Directory -Path (Join-Path -Path $baseDir -ChildPath $folder)
+    New-Item -ItemType Directory -Path (Join-Path -Path $baseDir -ChildPath $folder) -Force | Out-Null
 }
 
 # Create files with content
 $files = @{
-    "infrastructure\base_deployment\tfvars\dev.tfvars" = @"
-resource_group_name = 'devResourceGroup'
+    "infrastructure\base_deployment\tfvars\dev.tfvars" = "resource_group_name = 'devResourceGroup'
 location = 'eastus'
 aks_name = 'devAKSCluster'
-acr_name = 'devacrregistry'
-"@
-    "infrastructure\base_deployment\tfvars\prod.tfvars" = @"
-resource_group_name = 'prodResourceGroup'
+acr_name = 'devacrregistry'"
+    "infrastructure\base_deployment\tfvars\prod.tfvars" = "resource_group_name = 'prodResourceGroup'
 location = 'eastus'
 aks_name = 'prodAKSCluster'
-acr_name = 'prodacrregistry'
-"@
-    "infrastructure\base_deployment\tfvars\sit.tfvars" = @"
-resource_group_name = 'sitResourceGroup'
+acr_name = 'prodacrregistry'"
+    "infrastructure\base_deployment\tfvars\sit.tfvars" = "resource_group_name = 'sitResourceGroup'
 location = 'eastus'
 aks_name = 'sitAKSCluster'
-acr_name = 'sitacrregistry'
-"@
-    "infrastructure\base_deployment\tfvars\uat.tfvars" = @"
-resource_group_name = 'uatResourceGroup'
+acr_name = 'sitacrregistry'"
+    "infrastructure\base_deployment\tfvars\uat.tfvars" = "resource_group_name = 'uatResourceGroup'
 location = 'eastus'
 aks_name = 'uatAKSCluster'
-acr_name = 'uatacrregistry'
-"@
-    "infrastructure\base_deployment\main.tf" = @"
+acr_name = 'uatacrregistry'"
+    "infrastructure\base_deployment\main.tf" = @'
 terraform {
-  backend ""azurerm"" {}
+  backend "azurerm" {}
 }
 
-module ""log_analytics"" {
-  source              = ""../modules/log_analytics""
+module "log_analytics" {
+  source              = "../modules/log_analytics"
   resource_group_name = var.resource_group_name
   location            = var.location
   prefix              = var.prefix
   tags                = var.tags
 }
 
-module ""key_vault"" {
-  source              = ""../modules/key_vault""
+module "key_vault" {
+  source              = "../modules/key_vault"
   resource_group_name = var.resource_group_name
   location            = var.location
   tenant_id           = var.tenant_id
@@ -70,8 +62,8 @@ module ""key_vault"" {
   tags                = var.tags
 }
 
-module ""aks"" {
-  source              = ""../modules/aks""
+module "aks" {
+  source              = "../modules/aks"
   resource_group_name = var.resource_group_name
   location            = var.location
   aks_name            = var.aks_name
@@ -79,20 +71,20 @@ module ""aks"" {
   tags                = var.tags
 }
 
-module ""container_registry"" {
-  source              = ""../modules/container_registry""
+module "container_registry" {
+  source              = "../modules/container_registry"
   resource_group_name = var.resource_group_name
   location            = var.location
   acr_name            = var.acr_name
   tags                = var.tags
 }
-"@
-    "infrastructure\base_deployment\provider.tf" = @"
-provider ""azurerm"" {
+'@
+    "infrastructure\base_deployment\provider.tf" = @'
+provider "azurerm" {
   features {}
 }
 
-provider ""helm"" {
+provider "helm" {
   kubernetes {
     host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
     client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
@@ -101,62 +93,62 @@ provider ""helm"" {
   }
 }
 
-provider ""kubernetes"" {
+provider "kubernetes" {
   host                   = azurerm_kubernetes_cluster.aks.kube_config[0].host
   client_certificate     = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_certificate)
   client_key             = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].client_key)
   cluster_ca_certificate = base64decode(azurerm_kubernetes_cluster.aks.kube_config[0].cluster_ca_certificate)
 }
-"@
-    "infrastructure\base_deployment\variables.tf" = @"
-variable ""resource_group_name"" {}
-variable ""location"" {}
-variable ""prefix"" {}
-variable ""tenant_id"" {}
-variable ""aks_name"" {}
-variable ""acr_name"" {}
-variable ""tags"" {
+'@
+    "infrastructure\base_deployment\variables.tf" = @'
+variable "resource_group_name" {}
+variable "location" {}
+variable "prefix" {}
+variable "tenant_id" {}
+variable "aks_name" {}
+variable "acr_name" {}
+variable "tags" {
   type    = map(string)
   default = {}
 }
-"@
-    "infrastructure\variables\vars-dev.yml" = @"
+'@
+    "infrastructure\variables\vars-dev.yml" = @'
 variables:
-  resourceGroup: 'devResourceGroup'
-  location: 'eastus'
-  aksCluster: 'devAKSCluster'
-  acrName: 'devacrregistry'
-  imageName: 'training-environment'
-  imageTag: 'latest'
-"@
-    "infrastructure\variables\vars-prod.yml" = @"
+  resourceGroup: "devResourceGroup"
+  location: "eastus"
+  aksCluster: "devAKSCluster"
+  acrName: "devacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"
+'@
+    "infrastructure\variables\vars-prod.yml" = @'
 variables:
-  resourceGroup: 'prodResourceGroup'
-  location: 'eastus'
-  aksCluster: 'prodAKSCluster'
-  acrName: 'prodacrregistry'
-  imageName: 'training-environment'
-  imageTag: 'latest'
-"@
-    "infrastructure\variables\vars-sit.yml" = @"
+  resourceGroup: "prodResourceGroup"
+  location: "eastus"
+  aksCluster: "prodAKSCluster"
+  acrName: "prodacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"
+'@
+    "infrastructure\variables\vars-sit.yml" = @'
 variables:
-  resourceGroup: 'sitResourceGroup'
-  location: 'eastus'
-  aksCluster: 'sitAKSCluster'
-  acrName: 'sitacrregistry'
-  imageName: 'training-environment'
-  imageTag: 'latest'
-"@
-    "infrastructure\variables\vars-uat.yml" = @"
+  resourceGroup: "sitResourceGroup"
+  location: "eastus"
+  aksCluster: "sitAKSCluster"
+  acrName: "sitacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"
+'@
+    "infrastructure\variables\vars-uat.yml" = @'
 variables:
-  resourceGroup: 'uatResourceGroup'
-  location: 'eastus'
-  aksCluster: 'uatAKSCluster'
-  acrName: 'uatacrregistry'
-  imageName: 'training-environment'
-  imageTag: 'latest'
-"@
-    "infrastructure\k8s\windows-vm-deployment.yaml" = @"
+  resourceGroup: "uatResourceGroup"
+  location: "eastus"
+  aksCluster: "uatAKSCluster"
+  acrName: "uatacrregistry"
+  imageName: "training-environment"
+  imageTag: "latest"
+'@
+    "infrastructure\k8s\windows-vm-deployment.yaml" = @'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -172,14 +164,14 @@ spec:
         app: windows-vm
     spec:
       nodeSelector:
-        ""kubernetes.io/os"": windows
+        "kubernetes.io/os": windows
       containers:
       - name: windows-vm
         image: <your-windows-container-image>
         ports:
         - containerPort: 3389
-"@
-    "infrastructure\k8s\windows-vm-service.yaml" = @"
+'@
+    "infrastructure\k8s\windows-vm-service.yaml" = @'
 apiVersion: v1
 kind: Service
 metadata:
@@ -192,8 +184,8 @@ spec:
       port: 3389
       targetPort: 3389
   type: LoadBalancer
-"@
-    "azure-pipelines.yml" = @"
+'@
+    "azure-pipelines.yml" = @'
 trigger:
 - main
 
@@ -202,19 +194,19 @@ parameters:
   type: object
   default:
     - name: dev
-      subscriptionConnection: 'dev-service-connection'
+      subscriptionConnection: "dev-service-connection"
     - name: sit
-      subscriptionConnection: 'sit-service-connection'
+      subscriptionConnection: "sit-service-connection"
     - name: uat
-      subscriptionConnection: 'uat-service-connection'
+      subscriptionConnection: "uat-service-connection"
     - name: prod
-      subscriptionConnection: 'prod-service-connection'
+      subscriptionConnection: "prod-service-connection"
 
 pool:
-  vmImage: 'ubuntu-latest'
+  vmImage: "ubuntu-latest"
 
 variables:
-  terraformVersion: '1.0.0'
+  terraformVersion: "1.0.0"
 
 stages:
 - ${{ each env in parameters.environments }}:
@@ -228,8 +220,8 @@ stages:
       - task: AzureCLI@2
         inputs:
           azureSubscription: ${{ env.subscriptionConnection }}
-          scriptType: 'bash'
-          scriptLocation: 'inlineScript'
+          scriptType: "bash"
+          scriptLocation: "inlineScript"
           inlineScript: |
             az group create --name $(resourceGroup) --location $(location)
             az storage account create --name terraformbackend --resource-group $(resourceGroup) --location $(location) --sku Standard_LRS
@@ -242,14 +234,14 @@ stages:
         inputs:
           terraformVersion: $(terraformVersion)
 
-      - script: terraform init -backend-config=""resource_group_name=$(resourceGroup)"" -backend-config=""storage_account_name=terraformbackend"" -backend-config=""container_name=tfstate"" -backend-config=""key=terraform.tfstate""
-        displayName: 'Terraform Init'
+      - script: terraform init -backend-config="resource_group_name=$(resourceGroup)" -backend-config="storage_account_name=terraformbackend" -backend-config="container_name=tfstate" -backend-config="key=terraform.tfstate"
+        displayName: "Terraform Init"
 
       - script: terraform plan -out=plan.tfplan -var-file=infrastructure/base_deployment/tfvars/${{ env.name }}.tfvars
-        displayName: 'Terraform Plan'
+        displayName: "Terraform Plan"
 
       - script: terraform apply -input=false plan.tfplan
-        displayName: 'Terraform Apply'
+        displayName: "Terraform Apply"
 
 - stage: BuildAndPushDockerImage
   dependsOn: [${{ parameters.environments.name }}]
@@ -259,9 +251,9 @@ stages:
     - task: Docker@2
       inputs:
         containerRegistry: ${{ env.subscriptionConnection }}
-        repository: '$(acrName)/$(imageName)'
-        command: 'buildAndPush'
-        Dockerfile: '**/Dockerfile'
+        repository: "$(acrName)/$(imageName)"
+        command: "buildAndPush"
+        Dockerfile: "**/Dockerfile"
         tags: |
           $(imageTag)
 
@@ -273,8 +265,8 @@ stages:
     - task: AzureCLI@2
       inputs:
         azureSubscription: ${{ env.subscriptionConnection }}
-        scriptType: 'bash'
-        scriptLocation: 'inlineScript'
+        scriptType: "bash"
+        scriptLocation: "inlineScript"
         inlineScript: |
           az aks get-credentials --resource-group $(resourceGroup) --name $(aksCluster)
           helm repo add beryju https://charts.beryju.org
@@ -282,24 +274,22 @@ stages:
           helm install guacamole beryju/guacamole --set guacamole.server.image.tag=1.2.0
           kubectl apply -f k8s/windows-vm-deployment.yaml
           kubectl apply -f k8s/windows-vm-service.yaml
-"@
-    "Dockerfile" = @"
+'@
+    "Dockerfile" = @'
 FROM mcr.microsoft.com/windows/servercore:ltsc2019
 
 # Install necessary packages
-RUN powershell -Command \\
-    Add-WindowsFeature RDS-RD-Server
+RUN powershell -Command Add-WindowsFeature RDS-RD-Server
 
 # Enable RDP
-RUN powershell -Command \\
-    Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name ""fDenyTSConnections"" -Value 0
+RUN powershell -Command Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server" -Name "fDenyTSConnections" -Value 0
 
 # Open the RDP port
 EXPOSE 3389
 
 # Start RDP
-CMD [""powershell"", ""Start-Service -Name TermService; while ($true) { Start-Sleep -Seconds 3600 }""]
-"@
+CMD ["powershell", "Start-Service -Name TermService; while ($true) { Start-Sleep -Seconds 3600 }"]
+'@
 }
 
 foreach ($path in $files.Keys) {
