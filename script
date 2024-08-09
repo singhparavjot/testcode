@@ -1,43 +1,33 @@
-# Connect to your Azure account
-Connect-AzAccount
+#!/bin/bash
 
-# Define the Resource Group and VM names
-$resourceGroupName = "<YourResourceGroupName>"
-$vmList = Get-AzVM -ResourceGroupName $resourceGroupName
+# Output file
+output_file="azure_vm_export.csv"
 
-# Define the time range for the metrics (last 30 days)
-$endTime = Get-Date
-$startTime = $endTime.AddDays(-30)
+# CSV header
+echo "VM Name,OS,Machine SKU,CPU Utilization (30 days avg),Monthly VM Cost" > $output_file
 
-# Initialize an array to hold the report data
-$report = @()
+# Get current date and 30 days ago date
+end_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+start_date=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ")
 
-foreach ($vm in $vmList) {
-    # Get the VM details
-    $vmName = $vm.Name
-    $osType = $vm.StorageProfile.OsDisk.OsType
-    $sku = $vm.HardwareProfile.VmSize
+# Get list of VMs
+vm_list=$(az vm list --query '[].{Name:name, OS:storageProfile.osDisk.osType, SKU:hardwareProfile.vmSize}' -o json)
 
-    # Get CPU utilization metrics
-    $cpuMetrics = Get-AzMetric -ResourceId $vm.Id -MetricName "Percentage CPU" -StartTime $startTime -EndTime $endTime -AggregationType Average
-    $averageCpuUtilization = $cpuMetrics.Data.Average
+# Loop through each VM
+echo $vm_list | jq -c '.[]' | while read -r vm; do
+    name=$(echo $vm | jq -r '.Name')
+    os=$(echo $vm | jq -r '.OS')
+    sku=$(echo $vm | jq -r '.SKU')
 
-    # Get the monthly cost (approximation)
-    $vmCost = (Get-UsageAggregates -ReportedStartTime $startTime -ReportedEndTime $endTime -ShowDetails $true).UsageAggregations |
-              Where-Object { $_.InstanceData.MeteredResourceID -like "*$($vm.Id)*" } |
-              Measure-Object -Sum -Property PretaxCost | Select-Object -ExpandProperty Sum
+    # Get CPU utilization
+    cpu_data=$(az monitor metrics list --resource $name --metric "Percentage CPU" --start-time $start_date --end-time $end_date --interval PT1H --aggregation Average --query 'value[0].timeseries[0].data[*].average' -o tsv)
+    cpu_avg=$(echo $cpu_data | tr ' ' '\n' | awk '{ sum += $1; count++ } END { if (count > 0) print sum / count; else print "N/A" }')
 
-    # Add the VM details to the report
-    $report += [PSCustomObject]@{
-        VMName           = $vmName
-        OS               = $osType
-        SKU              = $sku
-        AvgCpuUtilization = [math]::round($averageCpuUtilization, 2)
-        MonthlyCost      = [math]::round($vmCost, 2)
-    }
-}
+    # Get monthly cost (this is an approximation, you may need to adjust the query)
+    cost=$(az cost management query --type ActualCost --timeframe MonthToDate --dataset-aggregation TotalCost --dataset-grouping name=VM --scope "subscriptions/your-subscription-id" --query "value[0].rows[?contains(@[0], '$name')][1]" -o tsv)
 
-# Export the report to a CSV file
-$report | Export-Csv -Path "C:\path\to\your\vm_report.csv" -NoTypeInformation
+    # Write to CSV
+    echo "$name,$os,$sku,$cpu_avg%,$cost" >> $output_file
+done
 
-Write-Host "VM report generated successfully at C:\path\to\your\vm_report.csv"
+echo "Export completed. Check $output_file for results."
