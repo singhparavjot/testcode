@@ -1,0 +1,17 @@
+$vmData = @()
+$vmList = az vm list --query "[].{Name:name, OS:storageProfile.osDisk.osType, SKU:hardwareProfile.vmSize}" -o json | ConvertFrom-Json
+
+foreach ($vm in $vmList) {
+    $cpuUtil = az monitor metrics list --resource $vm.Name --metric "Percentage CPU" --interval PT1H --timespan "30 days ago" --query "value[0].timeseries[0].data[*].average" -o tsv | Measure-Object -Average | Select-Object -ExpandProperty Average
+    $vmCost = az consumption usage list --query "[?contains(properties.instanceName, '$($vm.Name))].{Cost:properties.pretaxCost}" -o tsv | Measure-Object -Sum | Select-Object -ExpandProperty Sum
+    
+    $vmData += [PSCustomObject]@{
+        VMName          = $vm.Name
+        OS              = $vm.OS
+        SKU             = $vm.SKU
+        CPUUtilization  = [math]::round($cpuUtil, 2)
+        MonthlyCost     = [math]::round($vmCost, 2)
+    }
+}
+
+$vmData | Format-Table -AutoSize | Out-File "vm_report.txt"
