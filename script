@@ -1,33 +1,8 @@
-#!/bin/bash
-
-# Output file
-output_file="azure_vm_export.csv"
-
-# CSV header
-echo "VM Name,OS,Machine SKU,CPU Utilization (30 days avg),Monthly VM Cost" > $output_file
-
-# Get current date and 30 days ago date
-end_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-start_date=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ")
-
-# Get list of VMs
-vm_list=$(az vm list --query '[].{Name:name, OS:storageProfile.osDisk.osType, SKU:hardwareProfile.vmSize}' -o json)
-
-# Loop through each VM
-echo $vm_list | jq -c '.[]' | while read -r vm; do
-    name=$(echo $vm | jq -r '.Name')
-    os=$(echo $vm | jq -r '.OS')
-    sku=$(echo $vm | jq -r '.SKU')
-
-    # Get CPU utilization
-    cpu_data=$(az monitor metrics list --resource $name --metric "Percentage CPU" --start-time $start_date --end-time $end_date --interval PT1H --aggregation Average --query 'value[0].timeseries[0].data[*].average' -o tsv)
-    cpu_avg=$(echo $cpu_data | tr ' ' '\n' | awk '{ sum += $1; count++ } END { if (count > 0) print sum / count; else print "N/A" }')
-
-    # Get monthly cost (this is an approximation, you may need to adjust the query)
-    cost=$(az cost management query --type ActualCost --timeframe MonthToDate --dataset-aggregation TotalCost --dataset-grouping name=VM --scope "subscriptions/your-subscription-id" --query "value[0].rows[?contains(@[0], '$name')][1]" -o tsv)
-
-    # Write to CSV
-    echo "$name,$os,$sku,$cpu_avg%,$cost" >> $output_file
-done
-
-echo "Export completed. Check $output_file for results."
+Azure Kubernetes Service (AKS) -> Manages containerized applications with Kubernetes, offering scalability and orchestration.
+Azure Container Registry (ACR) -> Stores and manages Docker container images, enabling secure and scalable image storage.
+Ingress Controller (NGINX) -> Manages inbound traffic to the microservices, providing routing, SSL termination, and load balancing.
+Helm -> Simplifies Kubernetes application deployment, management, and versioning using Helm charts.
+Azure Virtual Network (VNet) -> Provides network isolation and security for AKS clusters, enabling secure communication.
+Azure Load Balancer -> Distributes incoming network traffic across multiple services to ensure reliability and availability.
+Azure Monitor -> Offers monitoring and diagnostics for AKS clusters, providing insights into performance and health.
+Azure Active Directory (AAD) -> Integrates identity and access management, ensuring secure authentication and authorization.
