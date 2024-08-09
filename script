@@ -1,17 +1,33 @@
-$vmData = @()
-$vmList = az vm list --query "[].{Name:name, OS:storageProfile.osDisk.osType, SKU:hardwareProfile.vmSize}" -o json | ConvertFrom-Json
+#!/bin/bash
 
-foreach ($vm in $vmList) {
-    $cpuUtil = az monitor metrics list --resource $vm.Name --metric "Percentage CPU" --interval PT1H --timespan "30 days ago" --query "value[0].timeseries[0].data[*].average" -o tsv | Measure-Object -Average | Select-Object -ExpandProperty Average
-    $vmCost = az consumption usage list --query "[?contains(properties.instanceName, '$($vm.Name))].{Cost:properties.pretaxCost}" -o tsv | Measure-Object -Sum | Select-Object -ExpandProperty Sum
-    
-    $vmData += [PSCustomObject]@{
-        VMName          = $vm.Name
-        OS              = $vm.OS
-        SKU             = $vm.SKU
-        CPUUtilization  = [math]::round($cpuUtil, 2)
-        MonthlyCost     = [math]::round($vmCost, 2)
-    }
-}
+# Output file
+output_file="azure_vm_export.csv"
 
-$vmData | Format-Table -AutoSize | Out-File "vm_report.txt"
+# CSV header
+echo "VM Name,OS,Machine SKU,CPU Utilization (30 days avg),Monthly VM Cost" > $output_file
+
+# Get current date and 30 days ago date
+end_date=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+start_date=$(date -u -d "30 days ago" +"%Y-%m-%dT%H:%M:%SZ")
+
+# Get list of VMs
+vm_list=$(az vm list --query '[].{Name:name, OS:storageProfile.osDisk.osType, SKU:hardwareProfile.vmSize}' -o json)
+
+# Loop through each VM
+echo $vm_list | jq -c '.[]' | while read -r vm; do
+    name=$(echo $vm | jq -r '.Name')
+    os=$(echo $vm | jq -r '.OS')
+    sku=$(echo $vm | jq -r '.SKU')
+
+    # Get CPU utilization
+    cpu_data=$(az monitor metrics list --resource $name --metric "Percentage CPU" --start-time $start_date --end-time $end_date --interval PT1H --aggregation Average --query 'value[0].timeseries[0].data[*].average' -o tsv)
+    cpu_avg=$(echo $cpu_data | tr ' ' '\n' | awk '{ sum += $1; count++ } END { if (count > 0) print sum / count; else print "N/A" }')
+
+    # Get monthly cost (this is an approximation, you may need to adjust the query)
+    cost=$(az cost management query --type ActualCost --timeframe MonthToDate --dataset-aggregation TotalCost --dataset-grouping name=VM --scope "subscriptions/your-subscription-id" --query "value[0].rows[?contains(@[0], '$name')][1]" -o tsv)
+
+    # Write to CSV
+    echo "$name,$os,$sku,$cpu_avg%,$cost" >> $output_file
+done
+
+echo "Export completed. Check $output_file for results."
